@@ -1,6 +1,16 @@
 FROM rasa/rasa:3.6.11
 
-COPY . /app
 WORKDIR /app
-RUN rasa train --no-prompt
-CMD ["rasa", "run", "--enable-api", "--cors", "*", "--debug", "--port", "8000"]
+COPY . /app
+
+# Удаляем файлы .pyc и прочее (на всякий случай)
+RUN find . -name '*.pyc' -delete
+
+# Устанавливаем зависимости, если есть кастомные actions
+# RUN pip install -r requirements.txt
+
+# Обучаем модель (теперь без лишнего)
+RUN rasa train
+
+# Запускаем Rasa-сервер
+CMD ["rasa", "run", "--enable-api", "--cors", "*", "--port", "8000"]

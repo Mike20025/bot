@@ -28,6 +28,7 @@
     #chat-header{display:flex;align-items:center;justify-content:space-between;padding: 22px 15px;background:#007bff;color:#fff}
     #chat-header .info{display:flex;align-items:center}
     #chat-header .info img{width:24px;height:24px;margin-right:10px}
+    #call-operator{background:#63e5db;border:none;color:#000;padding:4px 8px;border-radius:8px;cursor:pointer;font-size:14px}
     #chat-close{background:transparent;border:none;color:#fff;font-size:22px;cursor:pointer}
 
     /* сообщения */
@@ -118,6 +119,7 @@
         <div class="info-z">Чат поддержки</div>
       </div>
     </div>
+    <button id="call-operator" style="margin-right:10px">Позвать оператора</button>
     <button id="chat-close" title="Закрыть">×</button>
   </div>
 
@@ -136,6 +138,7 @@
     /* ─── 1. DOM-ссылки ─────────────────────────────────────────────── */
     const launcher = document.getElementById('mini-launcher'),
           chatWin  = document.getElementById('chat-window'),
+          callOp   = document.getElementById('call-operator'),
           closeBtn = document.getElementById('chat-close'),
           input    = document.getElementById('chat-question'),
           sendBtn  = document.getElementById('chat-send'),
@@ -146,7 +149,7 @@
       return s.toLowerCase().replace(/ё/g, 'е');
     }
 
-    const greetingWords = (
+const greetingWords = (
       'здравствуйте;приветствую;здрасти;привет;хай;здравствуй;' +
       'салют;добрый день;добрый вечер;хаю хай;приветос;чо как;приветик'
     ).split(';');
@@ -189,6 +192,17 @@
     let KB = [];
     let kbReady = false;
     let lastCategory = null;
+    let lastQuestion = '';
+const ws = new WebSocket('ws://' + location.host);
+ws.onmessage = e => {
+  const d = JSON.parse(e.data);
+  if(d.from==='operator') addMsg(d.text, 'bot');
+};
+
+fetch('/chat-config.json').then(r=>r.json()).then(cfg=>{
+  document.getElementById('chat-window').style.background=cfg.color;
+  if(cfg.greeting) showWelcome=()=>addMsg(cfg.greeting,'bot');
+});
 
     function parseTSV(txt){
       const rows = txt.split('\n'), out = [];
@@ -261,6 +275,14 @@ function sendDataToGoogle(q, a) {
   ).catch(err => console.warn('Sheets logging error:', err));
 }
 
+function saveQuery(q,a){
+  fetch('/query',{method:'POST',body:JSON.stringify({question:q,answer:a,timestamp:Date.now(),category:lastCategory})});
+}
+
+function saveRating(q,val){
+  fetch('/rating',{method:'POST',body:JSON.stringify({question:q,rating:val,timestamp:Date.now()})});
+}
+
     /* ─── 5. Вывод сообщений ─────────────────────────────────────────── */
     function addMsg(html, who){
       const wrap = document.createElement('div');
@@ -281,9 +303,18 @@ function sendDataToGoogle(q, a) {
       msgs.appendChild(wrap);
       if (who === 'bot') {
         wrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        showRating();
       } else {
         msgs.scrollTop = msgs.scrollHeight;
       }
+    }
+
+    function showRating(){
+      const box=document.createElement('div');
+      box.innerHTML='Бот был полезен? <button class="rate" data-v="yes">Да</button> <button class="rate" data-v="no">Нет</button>';
+      box.dataset.q=lastQuestion;
+      msgs.appendChild(box);
+      box.scrollIntoView({behavior:'smooth',block:'start'});
     }
 
     /* ─── 6. Приветствие + быстрые кнопки ───────────────────────────── */
@@ -427,6 +458,8 @@ function findAnswer(q) {
       const a = findAnswer(q);
       setTimeout(() => addMsg(a, 'bot'), 500);
       sendDataToGoogle(q, a);
+      saveQuery(q, a);
+      ws.send(JSON.stringify({from:'user',text:q}));
     }
 
     /* ─── 9. UI-события и загрузка TSV ──────────────────────────────── */
@@ -443,31 +476,44 @@ function findAnswer(q) {
       parent.postMessage({type:'chat',action:'collapse'},'*');
     };
 
+    callOp.onclick = ()=>{
+      ws.send(JSON.stringify({from:'system',text:'call_operator'}));
+      addMsg('Вы подключены к сотруднику', 'bot');
+    };
+
     input.oninput = ()=>{
       const ok = input.value.trim().length > 0;
       sendBtn.disabled = !ok;
       sendBtn.classList.toggle('active', ok);
     };
 
-    function send(){
-      const q = input.value.trim();
-      if(!q) return;
-      input.value = '';
-      sendBtn.disabled = true;
-      sendBtn.classList.remove('active');
+   function send(){
+     const q = input.value.trim();
+     if(!q) return;
+     input.value = '';
+     sendBtn.disabled = true;
+     sendBtn.classList.remove('active');
+      lastQuestion = q;
       processUserQuestion(q);
-    }
+   }
     sendBtn.onclick = send;
     input.onkeypress = e => { if(e.key==='Enter') send(); };
 
     msgs.addEventListener('click', e => {
-      if (!e.target.classList.contains('quick-btn')) return;
-      const intent = e.target.dataset.intent  ?? e.target.textContent.trim();
-      const label  = e.target.textContent.trim();
-      addMsg(label, 'user');
-      const answer = findAnswer(intent);
-      setTimeout(() => addMsg(answer, 'bot'), 500);
-      sendDataToGoogle(intent, answer);
+      if (e.target.classList.contains('quick-btn')) {
+        const intent = e.target.dataset.intent  ?? e.target.textContent.trim();
+        const label  = e.target.textContent.trim();
+        addMsg(label, 'user');
+        const answer = findAnswer(intent);
+        setTimeout(() => addMsg(answer, 'bot'), 500);
+        sendDataToGoogle(intent, answer);
+      }
+      if (e.target.classList.contains('rate')) {
+        const val = e.target.dataset.v;
+        const q = e.target.parentElement.dataset.q || lastQuestion;
+        saveRating(q, val);
+        e.target.parentElement.remove();
+      }
     });
 
     const baseUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTx1uVZ0r0qA_8cke68kTnHooWaiqgv4YoG5pVnDiMON9coL2IF5SSqP5z59FDH8dzne4OdKQOGVz7Q/pub?output=tsv';

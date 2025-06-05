@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>Админка</title>
+  <style>
+    body{font-family:Arial;margin:0;padding:0}
+    nav{background:#333;color:#fff;display:flex;gap:10px;padding:10px}
+    nav button{background:#555;color:#fff;border:none;padding:8px;cursor:pointer}
+    .section{display:none;padding:20px}
+    .active{display:block}
+    table{border-collapse:collapse;width:100%}
+    th,td{border:1px solid #ccc;padding:4px}
+    td[contenteditable]{background:#fdfdfd}
+  </style>
+</head>
+<body>
+<div id="login-screen">
+  <h2>Вход</h2>
+  <input id="login" placeholder="login"><br>
+  <input id="pass" type="password" placeholder="password"><br>
+  <button id="loginBtn">Войти</button>
+</div>
+<div id="app" style="display:none">
+  <nav>
+    <button data-sec="faq">FAQ редактор</button>
+    <button data-sec="spec">Специальности</button>
+    <button data-sec="services">Услуги</button>
+    <button data-sec="messages">Сообщения</button>
+    <button data-sec="settings">Настройки чата</button>
+    <button data-sec="analytics">Аналитика</button>
+  </nav>
+  <div id="faq" class="section">
+    <h3>FAQ</h3>
+    <input id="tsvUrl" placeholder="Google TSV URL" style="width:60%">
+    <button id="loadTsv">Загрузить</button>
+    <input type="file" id="tsvFile">
+    <table id="faqTable"></table>
+    <button id="addRow">Добавить строку</button>
+    <button id="saveTsv">Экспорт TSV</button>
+  </div>
+  <div id="spec" class="section"><h3>Специальности</h3></div>
+  <div id="services" class="section"><h3>Услуги</h3></div>
+  <div id="messages" class="section"><h3>Сообщения</h3><div id="msgList"></div></div>
+  <div id="settings" class="section">
+    <h3>Настройки</h3>
+    <label>Цвет: <input type="color" id="colorPick"></label><br>
+    <label>Логотип: <input type="file" id="logo"></label><br>
+    <label>Приветствие: <input id="greeting"></label><br>
+    <label>Автоответ: <input id="autoReply"></label><br>
+    <label><input type="checkbox" id="sound">Звук</label>
+    <label><input type="checkbox" id="anim">Анимация</label>
+    <button id="saveCfg">Сохранить</button>
+  </div>
+  <div id="analytics" class="section">
+    <h3>Аналитика</h3>
+    <canvas id="chart" width="600" height="300"></canvas>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="js/admin.js"></script>
+</body>
+</html>
